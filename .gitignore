@@ -1,3 +1,6 @@
 bin/
 *.o
 __pycache__/
+relatorio/node_modules/
+relatorio/preview/
+relatorio/package*.json
