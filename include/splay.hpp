@@ -1,165 +1,135 @@
-// ===========================================================================
-//  splay.hpp  -  Arvore Splay
-//  Trabalho Pratico I - Estruturas em Arvores Avancadas
-//
-//  A Splay e uma arvore binaria de busca AUTOAJUSTAVEL: a cada acesso
-//  (busca, insercao ou remocao) o no acessado e levado ate a RAIZ por meio
-//  de rotacoes (operacao "splay"). Assim, elementos usados com frequencia
-//  ficam perto da raiz -> otimo para padroes de acesso com localidade.
-//
-//  Nao guarda fator de balanceamento nem altura: o balanceamento e apenas
-//  AMORTIZADO. Cada operacao custa O(log n) AMORTIZADO (nao no pior caso
-//  individual, mas na media de uma sequencia de operacoes).
-//
-//  Casos de rotacao no splay (levando x para cima):
-//    zig      : x e filho da raiz              -> 1 rotacao
-//    zig-zig  : x e o pai sao filhos do mesmo lado -> 2 rotacoes iguais
-//    zig-zag  : x e o pai sao filhos de lados opostos -> 2 rotacoes opostas
-// ===========================================================================
-#ifndef SPLAY_HPP
-#define SPLAY_HPP
-
+#pragma once
 #include <ostream>
 
 class Splay {
 private:
-    struct No {
-        int chave;
-        No *esq = nullptr, *dir = nullptr, *pai = nullptr;
-        No(int c) : chave(c) {}
+    struct Node {
+        int key;
+        Node *left = nullptr, *right = nullptr, *parent = nullptr;
+        Node(int k) : key(k) {}
     };
 
-    No* raiz = nullptr;
+    Node* root = nullptr;
 
-    void destruir(No* n) {
+    void destroy(Node* n) {
         if (!n) return;
-        destruir(n->esq);
-        destruir(n->dir);
+        destroy(n->left);
+        destroy(n->right);
         delete n;
     }
 
-    // rotacao a esquerda em x (o filho direito sobe)
-    void rotEsq(No* x) {
-        No* y = x->dir;
-        x->dir = y->esq;
-        if (y->esq) y->esq->pai = x;
-        y->pai = x->pai;
-        if (!x->pai) raiz = y;
-        else if (x == x->pai->esq) x->pai->esq = y;
-        else x->pai->dir = y;
-        y->esq = x;
-        x->pai = y;
+    void rotateLeft(Node* x) {
+        Node* y = x->right;
+        x->right = y->left;
+        if (y->left) y->left->parent = x;
+        y->parent = x->parent;
+        if (!x->parent) root = y;
+        else if (x == x->parent->left) x->parent->left = y;
+        else x->parent->right = y;
+        y->left = x;
+        x->parent = y;
     }
 
-    // rotacao a direita em x (o filho esquerdo sobe)
-    void rotDir(No* x) {
-        No* y = x->esq;
-        x->esq = y->dir;
-        if (y->dir) y->dir->pai = x;
-        y->pai = x->pai;
-        if (!x->pai) raiz = y;
-        else if (x == x->pai->dir) x->pai->dir = y;
-        else x->pai->esq = y;
-        y->dir = x;
-        x->pai = y;
+    void rotateRight(Node* x) {
+        Node* y = x->left;
+        x->left = y->right;
+        if (y->right) y->right->parent = x;
+        y->parent = x->parent;
+        if (!x->parent) root = y;
+        else if (x == x->parent->right) x->parent->right = y;
+        else x->parent->left = y;
+        y->right = x;
+        x->parent = y;
     }
 
-    // leva x ate a raiz aplicando zig / zig-zig / zig-zag
-    void splay(No* x) {
-        while (x->pai) {
-            No* p = x->pai;
-            No* g = p->pai;
-            if (!g) {                                   // ZIG
-                if (x == p->esq) rotDir(p); else rotEsq(p);
-            } else if (x == p->esq && p == g->esq) {    // ZIG-ZIG (esq)
-                rotDir(g); rotDir(p);
-            } else if (x == p->dir && p == g->dir) {    // ZIG-ZIG (dir)
-                rotEsq(g); rotEsq(p);
-            } else if (x == p->dir && p == g->esq) {    // ZIG-ZAG
-                rotEsq(p); rotDir(g);
-            } else {                                    // ZIG-ZAG
-                rotDir(p); rotEsq(g);
+    void splay(Node* x) {
+        while (x->parent) {
+            Node* p = x->parent;
+            Node* g = p->parent;
+            if (!g) {
+                if (x == p->left) rotateRight(p); else rotateLeft(p);
+            } else if (x == p->left && p == g->left) {
+                rotateRight(g); rotateRight(p);
+            } else if (x == p->right && p == g->right) {
+                rotateLeft(g); rotateLeft(p);
+            } else if (x == p->right && p == g->left) {
+                rotateLeft(p); rotateRight(g);
+            } else {
+                rotateRight(p); rotateLeft(g);
             }
         }
     }
 
-    // busca padrao de BST; devolve o ultimo no visitado (para dar splay)
-    No* buscarNo(int chave) const {
-        No* atual = raiz;
-        No* ultimo = nullptr;
-        while (atual) {
-            ultimo = atual;
-            if (chave == atual->chave) return atual;
-            atual = (chave < atual->chave) ? atual->esq : atual->dir;
+    Node* searchNode(int key) const {
+        Node* cur = root;
+        Node* last = nullptr;
+        while (cur) {
+            last = cur;
+            if (key == cur->key) return cur;
+            cur = (key < cur->key) ? cur->left : cur->right;
         }
-        return ultimo;
+        return last;
     }
 
-    int escreverRec(No* n, std::ostream& os, int& proxId,
-                    const char* lado, int idPai) const {
-        int meuId = proxId++;
-        os << "N " << meuId << " " << n->chave << "\n";
-        if (idPai >= 0) os << "E " << idPai << " " << meuId << " " << lado << "\n";
-        if (n->esq) escreverRec(n->esq, os, proxId, "L", meuId);
-        if (n->dir) escreverRec(n->dir, os, proxId, "R", meuId);
-        return meuId;
+    int writeRec(Node* n, std::ostream& os, int& next_id,
+                 const char* side, int parent_id) const {
+        int my_id = next_id++;
+        os << "N " << my_id << " " << n->key << "\n";
+        if (parent_id >= 0) os << "E " << parent_id << " " << my_id << " " << side << "\n";
+        if (n->left) writeRec(n->left, os, next_id, "L", my_id);
+        if (n->right) writeRec(n->right, os, next_id, "R", my_id);
+        return my_id;
     }
 
 public:
-    ~Splay() { destruir(raiz); }
+    ~Splay() { destroy(root); }
 
-    // Insercao: BST comum + splay do no novo ate a raiz.
-    void inserir(int chave) {
-        if (!raiz) { raiz = new No(chave); return; }
-        No* atual = raiz;
-        No* pai = nullptr;
-        while (atual) {
-            pai = atual;
-            if (chave == atual->chave) { splay(atual); return; } // ja existe
-            atual = (chave < atual->chave) ? atual->esq : atual->dir;
+    void insert(int key) {
+        if (!root) { root = new Node(key); return; }
+        Node* cur = root;
+        Node* parent = nullptr;
+        while (cur) {
+            parent = cur;
+            if (key == cur->key) { splay(cur); return; }
+            cur = (key < cur->key) ? cur->left : cur->right;
         }
-        No* novo = new No(chave);
-        novo->pai = pai;
-        if (chave < pai->chave) pai->esq = novo; else pai->dir = novo;
-        splay(novo);
+        Node* fresh = new Node(key);
+        fresh->parent = parent;
+        if (key < parent->key) parent->left = fresh; else parent->right = fresh;
+        splay(fresh);
     }
 
-    // Busca: devolve true/false e leva o no acessado (ou o ultimo) a raiz.
-    bool buscar(int chave) {
-        No* n = buscarNo(chave);
+    bool search(int key) {
+        Node* n = searchNode(key);
         if (!n) return false;
         splay(n);
-        return n->chave == chave;
+        return n->key == key;
     }
 
-    // Remocao: da splay na chave, remove a raiz e "junta" as duas subarvores.
-    bool remover(int chave) {
-        No* n = buscarNo(chave);
+    bool remove(int key) {
+        Node* n = searchNode(key);
         if (!n) return false;
         splay(n);
-        if (n->chave != chave) return false;   // nao existia
+        if (n->key != key) return false;
 
-        No* esq = raiz->esq;
-        No* dir = raiz->dir;
-        if (esq) esq->pai = nullptr;
-        if (dir) dir->pai = nullptr;
-        delete raiz;
+        Node* left = root->left;
+        Node* right = root->right;
+        if (left) left->parent = nullptr;
+        if (right) right->parent = nullptr;
+        delete root;
 
-        if (!esq) { raiz = dir; return true; }
-        // maior elemento da subarvore esquerda vira a nova raiz (sem filho dir)
-        raiz = esq;
-        No* maior = esq;
-        while (maior->dir) maior = maior->dir;
-        splay(maior);
-        maior->dir = dir;
-        if (dir) dir->pai = maior;
+        if (!left) { root = right; return true; }
+        root = left;
+        Node* biggest = left;
+        while (biggest->right) biggest = biggest->right;
+        splay(biggest);
+        biggest->right = right;
+        if (right) right->parent = biggest;
         return true;
     }
 
-    void escreverArvore(std::ostream& os) const {
-        int proxId = 0;
-        if (raiz) escreverRec(raiz, os, proxId, "-", -1);
+    void writeTree(std::ostream& os) const {
+        int next_id = 0;
+        if (root) writeRec(root, os, next_id, "-", -1);
     }
 };
-
-#endif // SPLAY_HPP

@@ -24,13 +24,7 @@ bench: $(BIN)/bench
 	mkdir -p bench_out
 	./$(BIN)/bench
 
-# gera todas as imagens PNG (precisa de python3 + matplotlib + numpy)
-imagens: figs bench
-	python3 tools/treeviz.py
-	python3 tools/kdviz.py
-	python3 tools/plot_bench.py
-
 clean:
 	rm -rf $(BIN) figs/data/*.tree figs/data/*.space bench_out/*.csv
 
-.PHONY: all figs bench imagens clean
+.PHONY: all figs bench clean

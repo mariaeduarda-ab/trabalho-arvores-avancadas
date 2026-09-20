@@ -1,132 +1,106 @@
-// ===========================================================================
-//  treap.hpp  -  Arvore Treap (Tree + Heap)
-//  Trabalho Pratico I - Estruturas em Arvores Avancadas
-//
-//  A Treap combina duas propriedades ao mesmo tempo:
-//    (1) BST pelas CHAVES     -> esq < no < dir  (busca binaria comum)
-//    (2) MAX-HEAP pelas PRIORIDADES -> prioridade do pai >= prioridade dos filhos
-//
-//  A cada no e sorteada uma PRIORIDADE aleatoria. Como as prioridades sao
-//  aleatorias, a arvore fica balanceada em PROBABILIDADE (altura esperada
-//  O(log n)) sem precisar de regras complexas como AVL/rubro-negra.
-//
-//  O equilibrio entre as duas propriedades e mantido por ROTACOES simples
-//  durante a insercao e a remocao.
-// ===========================================================================
-#ifndef TREAP_HPP
-#define TREAP_HPP
-
+#pragma once
 #include <ostream>
 #include <random>
 
 class Treap {
 private:
-    struct No {
-        int chave;
-        int prioridade;
-        No *esq = nullptr, *dir = nullptr;
-        No(int c, int p) : chave(c), prioridade(p) {}
+    struct Node {
+        int key;
+        int priority;
+        Node *left = nullptr, *right = nullptr;
+        Node(int k, int p) : key(k), priority(p) {}
     };
 
-    No* raiz = nullptr;
-    std::mt19937 rng;                     // gerador com semente fixa -> reproduzivel
+    Node* root = nullptr;
+    std::mt19937 rng;
     std::uniform_int_distribution<int> dist{1, 999};
 
-    void destruir(No* n) {
+    void destroy(Node* n) {
         if (!n) return;
-        destruir(n->esq);
-        destruir(n->dir);
+        destroy(n->left);
+        destroy(n->right);
         delete n;
     }
 
-    // rotacao a direita: o filho esquerdo 'x' sobe e vira raiz da subarvore
-    No* rotDir(No* y) {
-        No* x = y->esq;
-        y->esq = x->dir;
-        x->dir = y;
+    Node* rotateRight(Node* y) {
+        Node* x = y->left;
+        y->left = x->right;
+        x->right = y;
         return x;
     }
 
-    // rotacao a esquerda: o filho direito 'y' sobe e vira raiz da subarvore
-    No* rotEsq(No* x) {
-        No* y = x->dir;
-        x->dir = y->esq;
-        y->esq = x;
+    Node* rotateLeft(Node* x) {
+        Node* y = x->right;
+        x->right = y->left;
+        y->left = x;
         return y;
     }
 
-    No* inserirRec(No* n, int chave) {
-        if (!n) return new No(chave, dist(rng));
-        if (chave < n->chave) {
-            n->esq = inserirRec(n->esq, chave);
-            // se o filho tem prioridade maior, ele deve subir (max-heap)
-            if (n->esq->prioridade > n->prioridade) n = rotDir(n);
-        } else if (chave > n->chave) {
-            n->dir = inserirRec(n->dir, chave);
-            if (n->dir->prioridade > n->prioridade) n = rotEsq(n);
+    Node* insertRec(Node* n, int key) {
+        if (!n) return new Node(key, dist(rng));
+        if (key < n->key) {
+            n->left = insertRec(n->left, key);
+            if (n->left->priority > n->priority) n = rotateRight(n);
+        } else if (key > n->key) {
+            n->right = insertRec(n->right, key);
+            if (n->right->priority > n->priority) n = rotateLeft(n);
         }
-        // chave igual: ignora (sem duplicatas)
         return n;
     }
 
-    No* removerRec(No* n, int chave, bool& achou) {
+    Node* removeRec(Node* n, int key, bool& found) {
         if (!n) return nullptr;
-        if (chave < n->chave) {
-            n->esq = removerRec(n->esq, chave, achou);
-        } else if (chave > n->chave) {
-            n->dir = removerRec(n->dir, chave, achou);
+        if (key < n->key) {
+            n->left = removeRec(n->left, key, found);
+        } else if (key > n->key) {
+            n->right = removeRec(n->right, key, found);
         } else {
-            achou = true;
-            if (!n->esq) { No* t = n->dir; delete n; return t; }
-            if (!n->dir) { No* t = n->esq; delete n; return t; }
-            // dois filhos: rotaciona o filho de MAIOR prioridade para cima
-            // e continua descendo o no ate virar folha
-            if (n->esq->prioridade > n->dir->prioridade) {
-                n = rotDir(n);
-                n->dir = removerRec(n->dir, chave, achou);
+            found = true;
+            if (!n->left) { Node* t = n->right; delete n; return t; }
+            if (!n->right) { Node* t = n->left; delete n; return t; }
+            if (n->left->priority > n->right->priority) {
+                n = rotateRight(n);
+                n->right = removeRec(n->right, key, found);
             } else {
-                n = rotEsq(n);
-                n->esq = removerRec(n->esq, chave, achou);
+                n = rotateLeft(n);
+                n->left = removeRec(n->left, key, found);
             }
         }
         return n;
     }
 
-    bool buscarRec(No* n, int chave) const {
+    bool searchRec(Node* n, int key) const {
         while (n) {
-            if (chave == n->chave) return true;
-            n = (chave < n->chave) ? n->esq : n->dir;
+            if (key == n->key) return true;
+            n = (key < n->key) ? n->left : n->right;
         }
         return false;
     }
 
-    int escreverRec(No* n, std::ostream& os, int& proxId,
-                    const char* lado, int idPai) const {
-        int meuId = proxId++;
-        // rotulo mostra a chave e a prioridade: chave(pPrioridade)
-        os << "N " << meuId << " " << n->chave << "(p" << n->prioridade << ")\n";
-        if (idPai >= 0) os << "E " << idPai << " " << meuId << " " << lado << "\n";
-        if (n->esq) escreverRec(n->esq, os, proxId, "L", meuId);
-        if (n->dir) escreverRec(n->dir, os, proxId, "R", meuId);
-        return meuId;
+    int writeRec(Node* n, std::ostream& os, int& next_id,
+                 const char* side, int parent_id) const {
+        int my_id = next_id++;
+        os << "N " << my_id << " " << n->key << "(p" << n->priority << ")\n";
+        if (parent_id >= 0) os << "E " << parent_id << " " << my_id << " " << side << "\n";
+        if (n->left) writeRec(n->left, os, next_id, "L", my_id);
+        if (n->right) writeRec(n->right, os, next_id, "R", my_id);
+        return my_id;
     }
 
 public:
-    explicit Treap(unsigned semente = 42) : rng(semente) {}
-    ~Treap() { destruir(raiz); }
+    explicit Treap(unsigned seed = 42) : rng(seed) {}
+    ~Treap() { destroy(root); }
 
-    void inserir(int chave) { raiz = inserirRec(raiz, chave); }
-    bool buscar(int chave) const { return buscarRec(raiz, chave); }
-    bool remover(int chave) {
-        bool achou = false;
-        raiz = removerRec(raiz, chave, achou);
-        return achou;
+    void insert(int key) { root = insertRec(root, key); }
+    bool search(int key) const { return searchRec(root, key); }
+    bool remove(int key) {
+        bool found = false;
+        root = removeRec(root, key, found);
+        return found;
     }
 
-    void escreverArvore(std::ostream& os) const {
-        int proxId = 0;
-        if (raiz) escreverRec(raiz, os, proxId, "-", -1);
+    void writeTree(std::ostream& os) const {
+        int next_id = 0;
+        if (root) writeRec(root, os, next_id, "-", -1);
     }
 };
-
-#endif // TREAP_HPP

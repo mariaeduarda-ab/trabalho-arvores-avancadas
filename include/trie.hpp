@@ -1,121 +1,96 @@
-// ===========================================================================
-//  trie.hpp  -  Trie (Arvore de Prefixos)
-//  Trabalho Pratico I - Estruturas em Arvores Avancadas
-//
-//  A Trie e uma arvore n-aria onde CADA ARESTA representa um caractere.
-//  Uma palavra e o caminho da raiz ate um no marcado como fim de palavra.
-//  Prefixos comuns compartilham o mesmo caminho, o que economiza comparacoes.
-//
-//  Operacoes: inserir, buscar, remover, comecaCom (prefixo).
-//  Custo das operacoes: O(m), onde m = comprimento da chave (NAO depende de n).
-// ===========================================================================
-#ifndef TRIE_HPP
-#define TRIE_HPP
-
+#pragma once
 #include <map>
 #include <string>
 #include <ostream>
 
 class Trie {
 private:
-    struct No {
-        bool fimDePalavra = false;      // marca se um caminho termina aqui
-        std::map<char, No*> filhos;     // map ordenado -> saida alfabetica bonita
+    struct Node {
+        bool is_end = false;
+        std::map<char, Node*> children;
     };
 
-    No* raiz;
+    Node* root;
 
-    // libera memoria recursivamente
-    void destruir(No* n) {
+    void destroy(Node* n) {
         if (!n) return;
-        for (auto& par : n->filhos) destruir(par.second);
+        for (auto& entry : n->children) destroy(entry.second);
         delete n;
     }
 
-    // usado na remocao: apaga um no se ele ficou "inutil"
-    // (nao e fim de palavra e nao tem filhos)
-    bool removerRec(No* n, const std::string& chave, size_t i) {
-        if (i == chave.size()) {
-            if (!n->fimDePalavra) return false; // palavra nao existia
-            n->fimDePalavra = false;
-            return n->filhos.empty();           // pode ser apagada pelo pai?
+    bool removeRec(Node* n, const std::string& key, size_t i) {
+        if (i == key.size()) {
+            if (!n->is_end) return false;
+            n->is_end = false;
+            return n->children.empty();
         }
-        char c = chave[i];
-        auto it = n->filhos.find(c);
-        if (it == n->filhos.end()) return false; // caminho nao existe
-        bool apagarFilho = removerRec(it->second, chave, i + 1);
-        if (apagarFilho) {
+        char c = key[i];
+        auto it = n->children.find(c);
+        if (it == n->children.end()) return false;
+        bool drop_child = removeRec(it->second, key, i + 1);
+        if (drop_child) {
             delete it->second;
-            n->filhos.erase(it);
-            // este no tambem pode ser apagado se ficou vazio e nao termina palavra
-            return n->filhos.empty() && !n->fimDePalavra;
+            n->children.erase(it);
+            return n->children.empty() && !n->is_end;
         }
         return false;
     }
 
-    // percorre a arvore atribuindo um id a cada no e imprime no formato .tree
-    int escreverRec(No* n, std::ostream& os, int& proxId,
-                    const std::string& rotuloAresta, int idPai) const {
-        int meuId = proxId++;
-        std::string rotuloNo = n->fimDePalavra ? "*" : "";  // '*' = fim de palavra
-        os << "N " << meuId << " " << (rotuloNo.empty() ? "-" : rotuloNo) << "\n";
-        if (idPai >= 0)
-            os << "E " << idPai << " " << meuId << " " << rotuloAresta << "\n";
-        for (auto& par : n->filhos)
-            escreverRec(par.second, os, proxId, std::string(1, par.first), meuId);
-        return meuId;
+    int writeRec(Node* n, std::ostream& os, int& next_id,
+                 const std::string& edge_label, int parent_id) const {
+        int my_id = next_id++;
+        std::string label = n->is_end ? "*" : "";
+        os << "N " << my_id << " " << (label.empty() ? "-" : label) << "\n";
+        if (parent_id >= 0)
+            os << "E " << parent_id << " " << my_id << " " << edge_label << "\n";
+        for (auto& entry : n->children)
+            writeRec(entry.second, os, next_id, std::string(1, entry.first), my_id);
+        return my_id;
     }
 
 public:
-    Trie() { raiz = new No(); }
-    ~Trie() { destruir(raiz); }
+    Trie() { root = new Node(); }
+    ~Trie() { destroy(root); }
 
-    // Insere a chave caractere a caractere, criando nos quando necessario.
-    void inserir(const std::string& chave) {
-        No* atual = raiz;
-        for (char c : chave) {
-            auto it = atual->filhos.find(c);
-            if (it == atual->filhos.end())
-                it = atual->filhos.emplace(c, new No()).first;
-            atual = it->second;
+    void insert(const std::string& key) {
+        Node* cur = root;
+        for (char c : key) {
+            auto it = cur->children.find(c);
+            if (it == cur->children.end())
+                it = cur->children.emplace(c, new Node()).first;
+            cur = it->second;
         }
-        atual->fimDePalavra = true;
+        cur->is_end = true;
     }
 
-    // Retorna true se a palavra completa existe.
-    bool buscar(const std::string& chave) const {
-        const No* atual = raiz;
-        for (char c : chave) {
-            auto it = atual->filhos.find(c);
-            if (it == atual->filhos.end()) return false;
-            atual = it->second;
+    bool search(const std::string& key) const {
+        const Node* cur = root;
+        for (char c : key) {
+            auto it = cur->children.find(c);
+            if (it == cur->children.end()) return false;
+            cur = it->second;
         }
-        return atual->fimDePalavra;
+        return cur->is_end;
     }
 
-    // Retorna true se algum caminho comeca com o prefixo dado.
-    bool comecaCom(const std::string& prefixo) const {
-        const No* atual = raiz;
-        for (char c : prefixo) {
-            auto it = atual->filhos.find(c);
-            if (it == atual->filhos.end()) return false;
-            atual = it->second;
+    bool startsWith(const std::string& prefix) const {
+        const Node* cur = root;
+        for (char c : prefix) {
+            auto it = cur->children.find(c);
+            if (it == cur->children.end()) return false;
+            cur = it->second;
         }
         return true;
     }
 
-    // Remove a chave; retorna true se a palavra existia.
-    bool remover(const std::string& chave) {
-        if (!buscar(chave)) return false;
-        removerRec(raiz, chave, 0);
+    bool remove(const std::string& key) {
+        if (!search(key)) return false;
+        removeRec(root, key, 0);
         return true;
     }
 
-    // Exporta a estrutura no formato lido pelo tools/treeviz.py
-    void escreverArvore(std::ostream& os) const {
-        int proxId = 0;
-        escreverRec(raiz, os, proxId, "-", -1);
+    void writeTree(std::ostream& os) const {
+        int next_id = 0;
+        writeRec(root, os, next_id, "-", -1);
     }
 };
-
-#endif // TRIE_HPP

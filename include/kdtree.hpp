@@ -1,192 +1,164 @@
-// ===========================================================================
-//  kdtree.hpp  -  KD-Tree (k-dimensional Tree, aqui com k = 2)
-//  Trabalho Pratico I - Estruturas em Arvores Avancadas
-//
-//  A KD-Tree organiza PONTOS em um espaco multidimensional. Cada nivel da
-//  arvore divide o espaco por uma dimensao diferente, de forma alternada:
-//    profundidade par  -> compara a coordenada X (corte vertical)
-//    profundidade impar-> compara a coordenada Y (corte horizontal)
-//
-//  Assim o plano vai sendo PARTICIONADO em retangulos. Isso permite buscas
-//  espaciais eficientes, como "vizinho mais proximo" (nearest neighbor),
-//  aproveitando a poda de regioes que nao podem conter a resposta.
-//
-//  Operacoes: inserir, buscar (ponto exato), vizinhoMaisProximo, remover.
-//  A remocao usa a tecnica classica de substituir o no removido pelo
-//  MINIMO da subarvore na dimensao do corte (findMin).
-// ===========================================================================
-#ifndef KDTREE_HPP
-#define KDTREE_HPP
-
+#pragma once
 #include <ostream>
 #include <cmath>
 #include <limits>
 
 class KDTree {
 public:
-    struct Ponto { double x, y; };
+    struct Point { double x, y; };
 
 private:
-    struct No {
-        Ponto p;
-        No *esq = nullptr, *dir = nullptr;
-        No(const Ponto& q) : p(q) {}
+    struct Node {
+        Point p;
+        Node *left = nullptr, *right = nullptr;
+        Node(const Point& q) : p(q) {}
     };
 
-    No* raiz = nullptr;
+    Node* root = nullptr;
 
-    static double coord(const Ponto& p, int eixo) { return eixo == 0 ? p.x : p.y; }
-    static bool igual(const Ponto& a, const Ponto& b) { return a.x == b.x && a.y == b.y; }
-    static double dist2(const Ponto& a, const Ponto& b) {
+    static double coord(const Point& p, int axis) { return axis == 0 ? p.x : p.y; }
+    static bool equal(const Point& a, const Point& b) { return a.x == b.x && a.y == b.y; }
+    static double dist2(const Point& a, const Point& b) {
         double dx = a.x - b.x, dy = a.y - b.y;
-        return dx * dx + dy * dy;                 // distancia ao quadrado (evita sqrt)
+        return dx * dx + dy * dy;
     }
 
-    void destruir(No* n) {
+    void destroy(Node* n) {
         if (!n) return;
-        destruir(n->esq); destruir(n->dir); delete n;
+        destroy(n->left); destroy(n->right); delete n;
     }
 
-    No* inserirRec(No* n, const Ponto& p, int prof) {
-        if (!n) return new No(p);
-        int eixo = prof % 2;
-        if (coord(p, eixo) < coord(n->p, eixo))
-            n->esq = inserirRec(n->esq, p, prof + 1);
+    Node* insertRec(Node* n, const Point& p, int depth) {
+        if (!n) return new Node(p);
+        int axis = depth % 2;
+        if (coord(p, axis) < coord(n->p, axis))
+            n->left = insertRec(n->left, p, depth + 1);
         else
-            n->dir = inserirRec(n->dir, p, prof + 1);
+            n->right = insertRec(n->right, p, depth + 1);
         return n;
     }
 
-    bool buscarRec(No* n, const Ponto& p, int prof) const {
+    bool searchRec(Node* n, const Point& p, int depth) const {
         if (!n) return false;
-        if (igual(n->p, p)) return true;
-        int eixo = prof % 2;
-        if (coord(p, eixo) < coord(n->p, eixo)) return buscarRec(n->esq, p, prof + 1);
-        return buscarRec(n->dir, p, prof + 1);
+        if (equal(n->p, p)) return true;
+        int axis = depth % 2;
+        if (coord(p, axis) < coord(n->p, axis)) return searchRec(n->left, p, depth + 1);
+        return searchRec(n->right, p, depth + 1);
     }
 
-    // no com menor coordenada 'eixoAlvo' na subarvore de 'n'
-    No* findMin(No* n, int eixoAlvo, int prof) const {
-        if (!n) return nullptr;
-        int eixo = prof % 2;
-        if (eixo == eixoAlvo) {
-            if (!n->esq) return n;                 // menor esta a esquerda ou e o proprio
-            return menorNo(n, findMin(n->esq, eixoAlvo, prof + 1), eixoAlvo);
-        }
-        // eixo diferente: o minimo pode estar dos dois lados
-        No* me = findMin(n->esq, eixoAlvo, prof + 1);
-        No* md = findMin(n->dir, eixoAlvo, prof + 1);
-        return menorNo(menorNo(n, me, eixoAlvo), md, eixoAlvo);
-    }
-
-    static No* menorNo(No* a, No* b, int eixo) {
+    static Node* minNode(Node* a, Node* b, int axis) {
         if (!a) return b;
         if (!b) return a;
-        return (coord(a->p, eixo) <= coord(b->p, eixo)) ? a : b;
+        return (coord(a->p, axis) <= coord(b->p, axis)) ? a : b;
     }
 
-    No* removerRec(No* n, const Ponto& p, int prof, bool& achou) {
+    Node* findMin(Node* n, int target_axis, int depth) const {
         if (!n) return nullptr;
-        int eixo = prof % 2;
-        if (igual(n->p, p)) {
-            achou = true;
-            if (n->dir) {
-                // substitui pelo minimo (no eixo atual) da subarvore direita
-                No* min = findMin(n->dir, eixo, prof + 1);
-                n->p = min->p;
-                n->dir = removerRec(n->dir, min->p, prof + 1, achou);
-            } else if (n->esq) {
-                // sem filho direito: usa o minimo da esquerda e move esq -> dir
-                No* min = findMin(n->esq, eixo, prof + 1);
-                n->p = min->p;
-                n->dir = removerRec(n->esq, min->p, prof + 1, achou);
-                n->esq = nullptr;
+        int axis = depth % 2;
+        if (axis == target_axis) {
+            if (!n->left) return n;
+            return minNode(n, findMin(n->left, target_axis, depth + 1), target_axis);
+        }
+        Node* ml = findMin(n->left, target_axis, depth + 1);
+        Node* mr = findMin(n->right, target_axis, depth + 1);
+        return minNode(minNode(n, ml, target_axis), mr, target_axis);
+    }
+
+    Node* removeRec(Node* n, const Point& p, int depth, bool& found) {
+        if (!n) return nullptr;
+        int axis = depth % 2;
+        if (equal(n->p, p)) {
+            found = true;
+            if (n->right) {
+                Node* m = findMin(n->right, axis, depth + 1);
+                n->p = m->p;
+                n->right = removeRec(n->right, m->p, depth + 1, found);
+            } else if (n->left) {
+                Node* m = findMin(n->left, axis, depth + 1);
+                n->p = m->p;
+                n->right = removeRec(n->left, m->p, depth + 1, found);
+                n->left = nullptr;
             } else {
-                delete n;                          // folha
+                delete n;
                 return nullptr;
             }
             return n;
         }
-        if (coord(p, eixo) < coord(n->p, eixo))
-            n->esq = removerRec(n->esq, p, prof + 1, achou);
+        if (coord(p, axis) < coord(n->p, axis))
+            n->left = removeRec(n->left, p, depth + 1, found);
         else
-            n->dir = removerRec(n->dir, p, prof + 1, achou);
+            n->right = removeRec(n->right, p, depth + 1, found);
         return n;
     }
 
-    void vmpRec(No* n, const Ponto& alvo, int prof, No*& melhor, double& melhorD2) const {
+    void nearestRec(Node* n, const Point& target, int depth, Node*& best, double& best_d2) const {
         if (!n) return;
-        double d2 = dist2(n->p, alvo);
-        if (d2 < melhorD2) { melhorD2 = d2; melhor = n; }
-        int eixo = prof % 2;
-        double diff = coord(alvo, eixo) - coord(n->p, eixo);
-        No* perto = (diff < 0) ? n->esq : n->dir;   // lado que contem o alvo
-        No* longe = (diff < 0) ? n->dir : n->esq;
-        vmpRec(perto, alvo, prof + 1, melhor, melhorD2);
-        // so visita o outro lado se ele PODE conter algo mais proximo (poda)
-        if (diff * diff < melhorD2)
-            vmpRec(longe, alvo, prof + 1, melhor, melhorD2);
+        double d2 = dist2(n->p, target);
+        if (d2 < best_d2) { best_d2 = d2; best = n; }
+        int axis = depth % 2;
+        double diff = coord(target, axis) - coord(n->p, axis);
+        Node* near_side = (diff < 0) ? n->left : n->right;
+        Node* far_side = (diff < 0) ? n->right : n->left;
+        nearestRec(near_side, target, depth + 1, best, best_d2);
+        if (diff * diff < best_d2)
+            nearestRec(far_side, target, depth + 1, best, best_d2);
     }
 
-    int escreverRec(No* n, std::ostream& os, int& proxId,
-                    const char* lado, int idPai, int prof) const {
-        int meuId = proxId++;
-        char eixo = (prof % 2 == 0) ? 'x' : 'y';    // dimensao de corte deste nivel
-        os << "N " << meuId << " (" << (int)n->p.x << "," << (int)n->p.y << ")[" << eixo << "]\n";
-        if (idPai >= 0) os << "E " << idPai << " " << meuId << " " << lado << "\n";
-        if (n->esq) escreverRec(n->esq, os, proxId, "L", meuId, prof + 1);
-        if (n->dir) escreverRec(n->dir, os, proxId, "R", meuId, prof + 1);
-        return meuId;
+    int writeRec(Node* n, std::ostream& os, int& next_id,
+                 const char* side, int parent_id, int depth) const {
+        int my_id = next_id++;
+        char axis = (depth % 2 == 0) ? 'x' : 'y';
+        os << "N " << my_id << " (" << (int)n->p.x << "," << (int)n->p.y << ")[" << axis << "]\n";
+        if (parent_id >= 0) os << "E " << parent_id << " " << my_id << " " << side << "\n";
+        if (n->left) writeRec(n->left, os, next_id, "L", my_id, depth + 1);
+        if (n->right) writeRec(n->right, os, next_id, "R", my_id, depth + 1);
+        return my_id;
     }
 
-    void escreverEspacoRec(No* n, std::ostream& os, int prof,
-                           double xmin, double xmax, double ymin, double ymax) const {
+    void writeSpaceRec(Node* n, std::ostream& os, int depth,
+                       double xmin, double xmax, double ymin, double ymax) const {
         if (!n) return;
         os << "PT " << n->p.x << " " << n->p.y << "\n";
-        int eixo = prof % 2;
-        if (eixo == 0) {                            // corte vertical em x
+        int axis = depth % 2;
+        if (axis == 0) {
             os << "SEG " << n->p.x << " " << ymin << " " << n->p.x << " " << ymax << "\n";
-            escreverEspacoRec(n->esq, os, prof + 1, xmin, n->p.x, ymin, ymax);
-            escreverEspacoRec(n->dir, os, prof + 1, n->p.x, xmax, ymin, ymax);
-        } else {                                    // corte horizontal em y
+            writeSpaceRec(n->left, os, depth + 1, xmin, n->p.x, ymin, ymax);
+            writeSpaceRec(n->right, os, depth + 1, n->p.x, xmax, ymin, ymax);
+        } else {
             os << "SEG " << xmin << " " << n->p.y << " " << xmax << " " << n->p.y << "\n";
-            escreverEspacoRec(n->esq, os, prof + 1, xmin, xmax, ymin, n->p.y);
-            escreverEspacoRec(n->dir, os, prof + 1, xmin, xmax, n->p.y, ymax);
+            writeSpaceRec(n->left, os, depth + 1, xmin, xmax, ymin, n->p.y);
+            writeSpaceRec(n->right, os, depth + 1, xmin, xmax, n->p.y, ymax);
         }
     }
 
 public:
-    ~KDTree() { destruir(raiz); }
+    ~KDTree() { destroy(root); }
 
-    void inserir(const Ponto& p) { raiz = inserirRec(raiz, p, 0); }
-    void inserir(double x, double y) { inserir(Ponto{x, y}); }
-    bool buscar(const Ponto& p) const { return buscarRec(raiz, p, 0); }
+    void insert(const Point& p) { root = insertRec(root, p, 0); }
+    void insert(double x, double y) { insert(Point{x, y}); }
+    bool search(const Point& p) const { return searchRec(root, p, 0); }
 
-    bool remover(const Ponto& p) {
-        bool achou = false;
-        raiz = removerRec(raiz, p, 0, achou);
-        return achou;
+    bool remove(const Point& p) {
+        bool found = false;
+        root = removeRec(root, p, 0, found);
+        return found;
     }
 
-    // devolve o ponto mais proximo do alvo (assume arvore nao vazia)
-    Ponto vizinhoMaisProximo(const Ponto& alvo) const {
-        No* melhor = nullptr;
-        double melhorD2 = std::numeric_limits<double>::infinity();
-        vmpRec(raiz, alvo, 0, melhor, melhorD2);
-        return melhor ? melhor->p : Ponto{0, 0};
+    Point nearestNeighbor(const Point& target) const {
+        Node* best = nullptr;
+        double best_d2 = std::numeric_limits<double>::infinity();
+        nearestRec(root, target, 0, best, best_d2);
+        return best ? best->p : Point{0, 0};
     }
 
-    void escreverArvore(std::ostream& os) const {
-        int proxId = 0;
-        if (raiz) escreverRec(raiz, os, proxId, "-", -1, 0);
+    void writeTree(std::ostream& os) const {
+        int next_id = 0;
+        if (root) writeRec(root, os, next_id, "-", -1, 0);
     }
 
-    // exporta pontos + segmentos de corte para desenhar o particionamento do plano
-    void escreverEspaco(std::ostream& os, double xmin, double xmax,
-                        double ymin, double ymax) const {
+    void writeSpace(std::ostream& os, double xmin, double xmax,
+                    double ymin, double ymax) const {
         os << "BB " << xmin << " " << xmax << " " << ymin << " " << ymax << "\n";
-        escreverEspacoRec(raiz, os, 0, xmin, xmax, ymin, ymax);
+        writeSpaceRec(root, os, 0, xmin, xmax, ymin, ymax);
     }
 };
-
-#endif // KDTREE_HPP

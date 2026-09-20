@@ -4,13 +4,13 @@ Implementação, visualização e análise experimental de **5 estruturas de dad
 hierárquicas** em C++17: **Trie**, **Árvore Patricia (Radix compacta)**,
 **Árvore Splay**, **Árvore Treap** e **KD-Tree**.
 
-> Disciplina: Estrutura de Dados — 5º semestre.
-> Relatório técnico em `relatorio/` (versão editável `.docx` e `.pdf`).
+> Disciplina: Algoritmos e Estruturas de Dados I (AEDS I).
+> Relatório técnico em `relatorio/` (`.pdf` e versão editável `.docx`).
 
 ## Estrutura do repositório
 
 ```
-include/         implementações (header-only, comentadas em português)
+include/         implementações (header-only) das 5 estruturas
   trie.hpp       Trie (árvore de prefixos)
   patricia.hpp   Árvore Patricia (radix tree compacta)
   splay.hpp      Árvore Splay (autoajustável)
@@ -19,37 +19,26 @@ include/         implementações (header-only, comentadas em português)
 src/
   gen_figs.cpp   demonstração das operações + gera os dados das figuras
   bench.cpp      experimentos de desempenho (gera os CSVs)
-tools/
-  treeviz.py     desenha as árvores (PNG) a partir dos .tree
-  kdviz.py       desenha o particionamento do plano da KD-Tree
-  plot_bench.py  gera os gráficos dos experimentos a partir dos CSVs
-figs/            imagens geradas (estados das árvores e gráficos)
+figs/            imagens do relatório (estados das árvores e gráficos)
 bench_out/       resultados dos experimentos (CSV)
-relatorio/       relatório técnico (.docx e .pdf)
+relatorio/       relatório técnico (.pdf e .docx)
 ```
 
-## Como compilar e reproduzir tudo
+## Como compilar e executar
 
-Requisitos: `g++` (C++17), `python3` com `matplotlib` e `numpy`.
+Requisitos: `g++` (C++17).
 
 ```bash
 make            # compila gen_figs e bench
 make figs       # roda a demonstração e gera os dados das figuras
 make bench      # roda os experimentos e gera os CSVs
-make imagens    # gera TODAS as imagens PNG (figuras + gráficos)
-```
-
-Ou simplesmente:
-
-```bash
-make imagens    # faz tudo: compila, roda e gera as imagens
 ```
 
 ## Operações implementadas por estrutura
 
 | Estrutura | Inserção | Busca | Remoção | Operações específicas |
 |-----------|:--------:|:-----:|:-------:|-----------------------|
-| Trie      | ✔ | ✔ | ✔ | busca por prefixo (`comecaCom`) |
+| Trie      | ✔ | ✔ | ✔ | busca por prefixo (`startsWith`) |
 | Patricia  | ✔ | ✔ | ✔ | split / merge de arestas |
 | Splay     | ✔ | ✔ | ✔ | splay (zig / zig-zig / zig-zag) |
 | Treap     | ✔ | ✔ | ✔ | rotações por prioridade |
